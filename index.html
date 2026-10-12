@@ -507,7 +507,7 @@ dialog::backdrop{background:rgba(52,38,24,.5)}
 .btn.big{height:42px;padding:0 22px;font-size:15px;border-radius:10px}
 .btn.danger{border-color:transparent;background:none;padding:0 4px;text-decoration:underline;text-underline-offset:3px}
 .btn[disabled]{opacity:.55;cursor:default}
-#imgDlg{width:min(430px,calc(100vw - 32px))}
+#imgDlg{width:min(480px,calc(100vw - 32px))}
 #archDlg{width:min(640px,calc(100vw - 32px))}
 .arch-status{margin:0;padding-left:1.1em;display:grid;gap:6px;font-size:14px;line-height:1.6}
 .arch-status .link{padding:0 2px;color:var(--accent)}
@@ -524,8 +524,9 @@ dialog::backdrop{background:rgba(52,38,24,.5)}
 .snaplist .sk{font-size:12px;color:var(--muted)}
 .snaplist .st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .snaplist .sw{font-size:12px;color:var(--muted);white-space:nowrap}
-.shot{max-height:min(62dvh,640px);overflow:auto;border:1px solid var(--line-strong);border-radius:6px;background:#fff}
-.shot img{display:block;width:100%}
+.shot{max-height:min(66dvh,720px);overflow:auto;padding:22px;border-radius:8px;background:#d8d1c4;box-shadow:inset 0 1px 3px rgba(60,40,20,.25)}
+.shot-wait{margin:0;padding:140px 0;text-align:center;color:#6c6358;font-size:13px}
+.shot img{display:block;width:100%;animation:fadeIn .3s;box-shadow:0 1px 2px rgba(50,35,20,.25),0 12px 28px -12px rgba(50,35,20,.45)}
 
 
 /* ───────── 追踪页：论文流程、申请材料、等回复 ───────── */
@@ -759,7 +760,8 @@ button.lib-ic:hover{background:#e8dcc9}
 .qa input[name=q],.qa input[name=name],.qa input[name=title],.qa input[name=url],.qa input[name=note]{flex:1 1 200px}
 .qa input:focus,.qa select:focus{outline:0;border-color:#c9b896;background:#fff;box-shadow:0 0 0 3px rgba(201,184,150,.25)}
 .qa .check2{font-size:13.5px;color:var(--muted)}
-.wt-add{display:grid}
+.wt-add{display:grid;align-items:end}                 /* .qa 里的 align-items:center 会把“记下”按钮顶到字段中间 */
+.wt-add .btn{height:36px}
 .tr-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
 .tr-search{flex:1 1 200px;height:32px;padding:0 12px;border:1px solid var(--line-strong);border-radius:16px;background:#fffdf9;font-size:13.5px}
 .segl{display:inline-flex;padding:2px;border-radius:9px;background:#efe8db;box-shadow:inset 0 1px 2px rgba(90,65,30,.1)}
@@ -1713,13 +1715,13 @@ dialog.cmdk[open]{animation:ckIn .2s var(--ease)}
 <dialog id="imgDlg" aria-labelledby="imgTitle">
   <div class="dlg">
     <h3 id="imgTitle">便签图片</h3>
-    <div class="shot"><img id="shotImg" alt="便签生成的图片预览"></div>
+    <div class="shot"><p class="shot-wait" id="shotWait">正在生成…</p><img id="shotImg" alt="便签生成的图片预览" hidden></div>
     <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>关闭</button><button type="button" class="btn primary" id="saveImg">保存图片</button></div>
   </div>
 </dialog>
 
 <noscript>这个页面需要启用 JavaScript 才能使用。</noscript>
-<script src="editor.js?v=2026-10-12i"></script>
+<script src="editor.js?v=2026-10-12j"></script>
 
 <script>
 (async () => {
@@ -1731,7 +1733,7 @@ const K_DATA = APP + '-v2', K_V1 = APP + '-v1', K_UI = APP + '-ui', K_SYNC = APP
 const GIST_FILE = APP + '.json';
 const K_TRACK = APP + '-track', TRACK_FILE = APP + '-track.json';     // 论文、申请、等回复：单独存放，旧版页面不会碰到
 const K_EXT = APP + '-ext', EXT_FILE = APP + '-ext.json';             // 侧边栏设置和后来加的功能
-const APP_VERSION = '2026-10-12i';
+const APP_VERSION = '2026-10-12j';
 const API = 'https://api.github.com';
 const DAY = 86400000, KEEP_DELETED = 90 * DAY;
 const WD = ['日','一','二','三','四','五','六'];
@@ -3923,104 +3925,261 @@ fmt.addEventListener('scroll', fmtFade, {passive:true});
 if (window.ResizeObserver) new ResizeObserver(fmtFade).observe(fmt);
 
 /* ═════════ 便签：生成图片 ═════════ */
+/* 像一张版画：棉纸纹理、压出来的版痕、墨色正文、版外铅笔小字，右下角一方朱印 */
 function noteCanvas(n){
   const cs = getComputedStyle(document.documentElement);
-  const FAM = {ui:cs.getPropertyValue('--ui').trim(), serif:cs.getPropertyValue('--serif').trim(), mono:cs.getPropertyValue('--mono').trim()};
-  const W = 750, PX = 64, CW = W - PX * 2, INK = '#33291f', MUTED = '#7b6d60', ACCENT = '#b9482d';
-  const font = (size, st = {}) => `${st.i ? 'italic ' : ''}${st.b ? 700 : 400} ${size}px ${st.c ? FAM.mono : st.serif ? FAM.serif : FAM.ui}`;
+  const SERIF = cs.getPropertyValue('--serif').trim(), MONO = cs.getPropertyValue('--mono').trim();
+  const LATIN = '"Baskerville","Iowan Old Style","Palatino","Palatino Linotype","Book Antiqua",Georgia,serif';
+  const W = 760, M = 48, PAD = 54, CW = W - 2 * (M + PAD);
+  const PAPER = '#f7f3ea', INK = '#231e19', SOFT = '#6c6358', LEAD = '#8b847a', SEAL = '#b3261e';
+  const font = (size, st = {}) => `${st.i ? 'italic ' : ''}${st.b ? 700 : 400} ${size}px ${st.c ? MONO : st.latin ? LATIN : SERIF}`;
   const probe = document.createElement('canvas').getContext('2d');
+  let seed = 2166136261; for (const ch of String(n.id)) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619);
+  const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const CJK = '\\u2e80-\\u9fff\\uf900-\\ufaff\\ufe30-\\ufe4f\\uff00-\\uffef';
   const UNIT = new RegExp(`[${CJK}]|\\s+|[^\\s${CJK}]+`, 'g');
   const HANG = /^[，。、；：！？）」』”’》〉】,.;:!?)\]]$/;
 
+  /* ── 排版：按字折行，标点不放行首；track 是字距 */
   function wrap(runs, size, maxW, base = {}){
-    const lines = [[]]; let x = 0;
+    const lines = [[]], track = base.track || 0; let x = 0;
     const put = (u, w, st) => { lines[lines.length - 1].push({u, x, w, st}); x += w; };
     for (const r of runs) {
-      const st = {b:!!(base.b || r.b), i:!!r.i, c:!!r.c, s:!!(base.s || r.s), a:!!r.href, serif:!!base.serif, muted:!!base.muted};
-      probe.font = font(st.c ? size * 0.9 : size, st);
+      const st = {b:!!(base.b || r.b), i:!!r.i, c:!!r.c, s:!!(base.s || r.s), a:!!r.href, soft:!!base.soft, latin:!!base.latin};
+      probe.font = font(st.c ? size * 0.86 : size, st);
       for (const u of r.x.match(UNIT) || []) {
-        const space = /^\s+$/.test(u), w = probe.measureText(u).width;
+        const space = /^\s+$/.test(u), w = probe.measureText(u).width + (space ? 0 : track * [...u].length);
         if (x + w > maxW && x > 0 && !HANG.test(u)) { lines.push([]); x = 0; }
         if (space && x === 0) continue;
-        if (w > maxW) for (const ch of u) { const cw = probe.measureText(ch).width; if (x + cw > maxW && x > 0) { lines.push([]); x = 0; } put(ch, cw, st); }
+        if (w > maxW) for (const ch of u) { const cw = probe.measureText(ch).width + track; if (x + cw > maxW && x > 0) { lines.push([]); x = 0; } put(ch, cw, st); }
         else put(u, w, st);
       }
     }
-    return lines;
+    for (const l of lines) while (l.length && /^\s+$/.test(l[l.length - 1].u)) l.pop();
+    return lines.filter((l, i) => l.length || i === 0);
   }
-  function draw(ctx, lines, x0, y, size, lh){
+  const lineW = l => l.length ? l[l.length - 1].x + l[l.length - 1].w : 0;
+  function draw(ctx, lines, x0, y, size, lh, base = {}){
     for (const line of lines) {
-      const mid = y + lh / 2;
+      const mid = y + lh / 2, dx = base.center ? (base.maxW - lineW(line)) / 2 : 0;
       for (const p of line) {
-        ctx.font = font(p.st.c ? size * 0.9 : size, p.st);
-        if (p.st.c) { ctx.fillStyle = '#f1eadb'; ctx.fillRect(x0 + p.x - 3, mid - size * 0.66, p.w + 6, size * 1.32); }
-        ctx.fillStyle = p.st.a ? ACCENT : p.st.muted ? MUTED : INK;
-        ctx.fillText(p.u, x0 + p.x, mid);
-        if (p.st.s) ctx.fillRect(x0 + p.x, mid, p.w, 1.5);
-        if (p.st.a) ctx.fillRect(x0 + p.x, mid + size * 0.58, p.w, 1.5);
+        const sz = p.st.c ? size * 0.86 : size, x = x0 + dx + p.x;
+        ctx.font = font(sz, p.st);
+        if (p.st.c) { ctx.fillStyle = 'rgba(70,52,30,.07)'; ctx.fillRect(x - 3, mid - size * 0.62, p.w + 6, size * 1.24); }
+        ctx.fillStyle = p.st.soft || p.st.s ? SOFT : INK;
+        if (base.track && !p.st.c && [...p.u].length === 1) ctx.fillText(p.u, x, mid);
+        else if (base.track && !p.st.c) { let cx = x; for (const ch of p.u) { ctx.fillText(ch, cx, mid); probe.font = ctx.font; cx += probe.measureText(ch).width + base.track; } }
+        else ctx.fillText(p.u, x, mid);
+        if (p.st.s) ctx.fillRect(x, mid + 1, p.w, 1.2);
+        if (p.st.a) ctx.fillRect(x, mid + size * 0.62, p.w, 1);
       }
       y += lh;
     }
   }
-  const blocks = parseMd(n.text);
-  function paint(ctx){                                   // ctx 为空时只量高度
-    let y = 80;
-    const text = (runs, size, lh, x, w, base) => { const ls = wrap(runs, size, w, base); if (ctx) draw(ctx, ls, x, y, size, lh); y += ls.length * lh; };
-    if (n.day) { text([{x:fmtLong(n.day)}], 40, 60, PX, CW, {b:1, serif:1}); y += 20; }
+
+  /* ── 公式：常见的 LaTeX 写法换成 Unicode 字符，像排印的公式那样用斜体 */
+  const SUP = {0:'⁰', 1:'¹', 2:'²', 3:'³', 4:'⁴', 5:'⁵', 6:'⁶', 7:'⁷', 8:'⁸', 9:'⁹', '+':'⁺', '-':'⁻', '=':'⁼', '(':'⁽', ')':'⁾', n:'ⁿ', i:'ⁱ'};
+  const SUB = {0:'₀', 1:'₁', 2:'₂', 3:'₃', 4:'₄', 5:'₅', 6:'₆', 7:'₇', 8:'₈', 9:'₉', '+':'₊', '-':'₋', '=':'₌', '(':'₍', ')':'₎', a:'ₐ', e:'ₑ', h:'ₕ', i:'ᵢ', j:'ⱼ', k:'ₖ', l:'ₗ', m:'ₘ', n:'ₙ', o:'ₒ', p:'ₚ', r:'ᵣ', s:'ₛ', t:'ₜ', u:'ᵤ', v:'ᵥ', x:'ₓ'};
+  const SYM = {alpha:'α', beta:'β', gamma:'γ', delta:'δ', epsilon:'ε', varepsilon:'ε', zeta:'ζ', eta:'η', theta:'θ', kappa:'κ', lambda:'λ', mu:'μ', nu:'ν', xi:'ξ', pi:'π', rho:'ρ', sigma:'σ', tau:'τ', phi:'φ', varphi:'φ', chi:'χ', psi:'ψ', omega:'ω',
+    Gamma:'Γ', Delta:'Δ', Theta:'Θ', Lambda:'Λ', Xi:'Ξ', Pi:'Π', Sigma:'Σ', Phi:'Φ', Psi:'Ψ', Omega:'Ω', cdot:'·', times:'×', pm:'±', mp:'∓', leq:'≤', le:'≤', geq:'≥', ge:'≥', neq:'≠', ne:'≠', approx:'≈', sim:'∼', simeq:'≃', propto:'∝', infty:'∞',
+    partial:'∂', nabla:'∇', int:'∫', oint:'∮', sum:'∑', prod:'∏', to:'→', rightarrow:'→', leftarrow:'←', Rightarrow:'⇒', odot:'⊙', circ:'∘', degree:'°', ldots:'…', dots:'…', cdots:'⋯', parallel:'∥', perp:'⊥', hbar:'ħ', ell:'ℓ', AA:'Å', sqrt:'√'};
+  const mapAll = (t, tab) => [...t].every(ch => tab[ch]) ? [...t].map(ch => tab[ch]).join('') : null;
+  function tex(t){
+    let s = String(t);
+    for (let k = 0; k < 3; k++) s = s.replace(/\\(?:mathrm|rm|text|mathit|mathbf|operatorname)\s*\{([^{}]*)\}/g, '$1').replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, (m, a, b) => a === '1' && b === '2' ? '½' : `${a.length > 1 ? '(' + a + ')' : a}/${b.length > 1 ? '(' + b + ')' : b}`);
+    s = s.replace(/\\(?:left|right|displaystyle|rm|it|bf|,|;|!|quad|qquad)/g, ' ').replace(/\\([A-Za-z]+)/g, (m, w) => SYM[w] || w);
+    s = s.replace(/\^\{([^{}]*)\}|\^(\S)/g, (m, a, b) => mapAll((a ?? b).trim(), SUP) || '^' + (a ?? b).trim()).replace(/_\{([^{}]*)\}|_(\S)/g, (m, a, b) => mapAll((a ?? b).trim(), SUB) || '_' + (a ?? b).trim());
+    return s.replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
+  }
+  const mathIn = s => String(s || '').replace(/(?<![\\\w$])\$([^$\s](?:[^$\n]*[^$\s])?)\$(?![\w$])/g, (m, a) => `*${tex(a)}*`);
+
+  /* ── 内容：把表格、公式块、提示框、图片挑出来 */
+  const raw = parseMd(n.text), blocks = [];
+  for (let i = 0; i < raw.length; i++) {
+    const b = raw[i];
+    if (b.t === 'p' && b.s === '$$') { const t = []; i++; while (i < raw.length && !(raw[i].t === 'p' && raw[i].s === '$$')) { if (raw[i].s) t.push(raw[i].s); i++; } blocks.push({t:'math', text:t.join(' ')}); continue; }
+    if (b.t === 'p' && /^\$\$.+\$\$$/.test(b.s)) { blocks.push({t:'math', text:b.s.slice(2, -2)}); continue; }
+    if (b.t === 'p' && b.s.startsWith('|')) { const rows = []; while (i < raw.length && raw[i].t === 'p' && raw[i].s.startsWith('|')) rows.push(raw[i++].s); i--; blocks.push({t:'table', rows}); continue; }
+    if (b.t === 'p' && /^!\[[^\]]*\]\([^)]*\)$/.test(b.s)) { blocks.push({t:'img', alt:(/^!\[([^\]]*)\]/.exec(b.s) || [])[1] || ''}); continue; }
+    if (b.t === 'quote' && /^\[![\w-]+\]/.test(b.s)) { const m = /^\[!([\w-]+)\][+-]?\s*(.*)$/.exec(b.s); blocks.push({t:'callout', kind:m[1].toLowerCase(), s:m[2]}); continue; }
+    blocks.push(b);
+  }
+  for (const b of blocks) if (typeof b.s === 'string') b.s = mathIn(b.s);
+  while (blocks.length && blocks[0].t === 'gap') blocks.shift();
+  while (blocks.length && blocks[blocks.length - 1].t === 'gap') blocks.pop();
+  // 标题：每日便签用日期；其他便签用第一行
+  let title = null, sub = '';
+  const at = new Date(n.day ? dayNum(n.day) * DAY + new Date().getTimezoneOffset() * 60000 : (n.created || n.updated || now()));
+  const CN = '〇一二三四五六七八九', cnNum = x => x <= 10 ? (x === 10 ? '十' : CN[x]) : x < 20 ? '十' + CN[x % 10] : CN[Math.floor(x / 10)] + '十' + (x % 10 ? CN[x % 10] : '');
+  if (n.day) { const p = parts(dayNum(n.day)); title = inline(`${cnNum(p.m)}月${cnNum(p.d)}日`); sub = `${String(p.y).split('').map(d => CN[d]).join('')}年　星期${'日一二三四五六'[p.w]}`; }
+  else if (blocks.length && (blocks[0].t === 'h' || blocks[0].t === 'p')) title = inline(blocks.shift().s);
+  while (blocks.length && blocks[0].t === 'gap') blocks.shift();
+  // 很短、没有列表表格的便签：居中，像一首诗
+  const poem = !blocks.some(b => !['p', 'gap', 'h', 'hr', 'quote'].includes(b.t)) && blocks.filter(b => b.t !== 'gap').length <= 8 && blocks.every(b => !b.s || b.s.length <= 60);
+  const TS = title && [...(title.map(r => r.x).join(''))].length <= 14 ? 42 : 34;
+
+  /* ── 量高度 / 画：ctx 为空时只量 */
+  function body(ctx, y0){
+    let y = y0;
+    const X = M + PAD;
+    const text = (runs, size, lh, x, w, base = {}) => {
+      let ls = wrap(runs, size, w, base);
+      if (base.balance && ls.length > 1) { let lo = w * 0.4, hi = w; for (let k = 0; k < 9; k++) { const mid = (lo + hi) / 2; if (wrap(runs, size, mid, base).length > ls.length) lo = mid; else hi = mid; } ls = wrap(runs, size, hi, base); }
+      if (ctx) draw(ctx, ls, x, y, size, lh, {...base, maxW:w}); y += ls.length * lh; return ls;
+    };
+    if (title) {
+      text(title, TS, Math.round(TS * 1.45), X, CW, {track:TS * 0.08, center:poem, balance:poem});
+      if (sub) { y += 6; text([{x:sub}], 17, 28, X, CW, {soft:1, track:3, center:poem}); }
+      if (blocks.length) {
+        y += 26;
+        if (ctx) { ctx.fillStyle = 'rgba(35,30,25,.55)'; ctx.fillRect(poem ? W / 2 - 14 : X, y, 28, 1.2); }
+        y += 30;
+      }
+    }
+    const BS = 25, LH = 48;
+    let prevGap = false;
     for (const b of blocks) {
-      const ix = (b.ind || 0) * 38;
-      if (b.t === 'gap') y += 22;
-      else if (b.t === 'h') { const sz = [0, 40, 34, 30][b.level]; y += 8; text(inline(b.s), sz, Math.round(sz * 1.5), PX, CW, {b:1, serif:1}); y += 8; }
-      else if (b.t === 'hr') { if (ctx) { ctx.fillStyle = '#d2c8b6'; ctx.fillRect(PX, y + 22, CW, 1.5); } y += 46; }
+      const ix = (b.ind || 0) * 30, c = poem;
+      if (b.t === 'gap') { if (!prevGap) y += 16; prevGap = true; continue; }
+      prevGap = false;
+      if (b.t === 'h') { const sz = [0, 30, 28, 26][b.level]; y += 14; text(inline(b.s), sz, Math.round(sz * 1.6), X, CW, {b:1, center:c}); y += 4; }
+      else if (b.t === 'hr') { if (ctx) { ctx.fillStyle = 'rgba(35,30,25,.35)'; for (const d of [-14, 0, 14]) { ctx.beginPath(); ctx.arc(W / 2 + d, y + 22, 1.6, 0, 7); ctx.fill(); } } y += 44; }
       else if (b.t === 'ul' || b.t === 'ol') {
-        if (ctx) { ctx.font = font(28); ctx.fillStyle = INK; ctx.fillText(b.t === 'ul' ? '•' : b.n + '.', PX + ix + (b.t === 'ul' ? 8 : 0), y + 24); }
-        text(inline(b.s), 28, 48, PX + ix + 42, CW - ix - 42);
+        if (ctx) { if (b.t === 'ul') { ctx.fillStyle = INK; ctx.fillRect(X + ix + 4, y + LH / 2 - 0.6, 9, 1.3); } else { ctx.font = font(19, {latin:1, i:1}); ctx.fillStyle = SOFT; ctx.fillText(b.n + '.', X + ix, y + LH / 2 + 1); } }
+        text(inline(b.s), BS, LH, X + ix + 30, CW - ix - 30);
       }
       else if (b.t === 'todo') {
         if (ctx) {
-          const bx = PX + ix + 1, by = y + 11;
-          ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(bx, by, 26, 26, 6); else ctx.rect(bx, by, 26, 26);
-          if (b.done) { ctx.fillStyle = ACCENT; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(bx + 6.5, by + 13.5); ctx.lineTo(bx + 11.5, by + 18.5); ctx.lineTo(bx + 20, by + 8.5); ctx.stroke(); }
-          else { ctx.fillStyle = '#fffdf8'; ctx.fill(); ctx.strokeStyle = '#a8977e'; ctx.lineWidth = 2; ctx.stroke(); }
+          const bx = X + ix + 2, by = y + LH / 2 - 8.5;
+          ctx.strokeStyle = b.done ? 'rgba(35,30,25,.45)' : INK; ctx.lineWidth = 1.3; ctx.strokeRect(bx, by, 17, 17);
+          if (b.done) { ctx.strokeStyle = INK; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(bx + 3, by + 9); ctx.lineTo(bx + 7.5, by + 13.5); ctx.lineTo(bx + 19, by - 1.5); ctx.stroke(); }
         }
-        text(inline(b.s), 28, 48, PX + ix + 42, CW - ix - 42, b.done ? {s:1, muted:1} : {});
+        text(inline(b.s), BS, LH, X + ix + 32, CW - ix - 32, b.done ? {soft:1} : {});
       }
-      else if (b.t === 'quote') { const y0 = y; text(inline(b.s), 28, 48, PX + 24, CW - 24, {muted:1}); if (ctx) { ctx.fillStyle = '#d9cdb6'; ctx.fillRect(PX, y0 + 5, 5, y - y0 - 10); } }
+      else if (b.t === 'quote' || b.t === 'callout') {
+        const y1 = y;
+        if (b.t === 'callout') { const label = {note:'注', tip:'提示', important:'要点', warning:'注意', caution:'注意', question:'问'}[b.kind] || b.kind; text([{x:label + (b.s && b.s !== label ? '　' + b.s : '')}], 20, 40, X + 22, CW - 22, {b:1, soft:1}); }
+        else text(inline(b.s), BS, LH, X + 22, CW - 22, {soft:1, center:false});
+        if (ctx) { ctx.fillStyle = 'rgba(35,30,25,.28)'; ctx.fillRect(X + 1, y1, 1.4, y - y1); }      // 连续几行引用，竖线连成一条
+      }
       else if (b.t === 'code') {
-        probe.font = font(23, {c:1});
-        const ls = b.text.split('\n').flatMap(l => {                      // 代码按字符硬折行
-          const rows = ['']; let w = 0;
-          for (const ch of l) { const cw = probe.measureText(ch).width; if (w + cw > CW - 36 && w > 0) { rows.push(''); w = 0; } rows[rows.length - 1] += ch; w += cw; }
-          return rows;
-        }), h = ls.length * 38 + 28;
-        if (ctx) { ctx.fillStyle = '#f1eadb'; ctx.fillRect(PX, y + 6, CW, h); ctx.font = font(23, {c:1}); ctx.fillStyle = INK; ls.forEach((l, i) => ctx.fillText(l, PX + 18, y + 6 + 14 + 19 + i * 38)); }
-        y += h + 14;
+        const size = 18, lh = 30; probe.font = font(size, {c:1});
+        const ls = b.text.split('\n').flatMap(l => { const rows = ['']; let w = 0; for (const ch of l) { const cw = probe.measureText(ch).width; if (w + cw > CW - 32 && w > 0) { rows.push(''); w = 0; } rows[rows.length - 1] += ch; w += cw; } return rows; });
+        const h = ls.length * lh + 26;
+        if (ctx) { ctx.fillStyle = 'rgba(70,52,30,.045)'; ctx.fillRect(X, y + 8, CW, h); ctx.font = font(size, {c:1}); ctx.fillStyle = INK; ls.forEach((l, i) => ctx.fillText(l, X + 16, y + 8 + 13 + lh / 2 + i * lh)); }
+        y += h + 20;
       }
-      else text(inline(b.s), 28, 48, PX, CW);
+      else if (b.t === 'math') { y += 8; text([{x:tex(b.text), i:1}], 25, 44, X, CW, {latin:1, center:true}); y += 8; }
+      else if (b.t === 'img') { text([{x:`〔图${b.alt && b.alt !== '图' ? '：' + b.alt : ''}〕`}], 20, 40, X, CW, {soft:1, center:true}); }
+      else if (b.t === 'table') {
+        const rows = b.rows.filter((r, i) => i !== 1 || !/^\|?\s*:?-{2,}/.test(r)).map(r => rowCells(r).map(cell => cell.text)), nc = Math.max(...rows.map(r => r.length));
+        const size = 19, lh = 32, gap = 18;
+        probe.font = font(size);
+        const nat = Array.from({length:nc}, (_, k) => Math.max(40, ...rows.map(r => probe.measureText((r[k] || '').replace(/[*`=~]/g, '')).width)));
+        const tot = nat.reduce((a, v) => a + v, 0) + gap * (nc - 1), cols = nat.map(v => tot > CW ? Math.max(48, v * (CW - gap * (nc - 1)) / (tot - gap * (nc - 1))) : v);
+        y += 10;
+        if (ctx) { ctx.fillStyle = 'rgba(35,30,25,.6)'; ctx.fillRect(X, y, CW, 1.2); }
+        rows.forEach((r, ri) => {
+          let x = X, h = 0; const ys = y + 6;
+          for (let k = 0; k < nc; k++) { const ls = wrap(inline(r[k] || ''), size, cols[k], ri === 0 ? {b:1} : {}); if (ctx) draw(ctx, ls, x, ys, size, lh); h = Math.max(h, ls.length * lh); x += cols[k] + gap; }
+          y = ys + h + 6;
+          if (ctx) { ctx.fillStyle = ri === 0 ? 'rgba(35,30,25,.45)' : 'rgba(35,30,25,.12)'; ctx.fillRect(X, y, CW, ri === 0 || ri === rows.length - 1 ? 1.1 : 0.8); }
+        });
+        if (ctx) { ctx.fillStyle = 'rgba(35,30,25,.6)'; ctx.fillRect(X, y, CW, 1.2); }
+        y += 18;
+      }
+      else text(inline(b.s), BS, LH, X, CW, {center:c, balance:c});
     }
-    y += 52;
-    if (ctx) { ctx.fillStyle = '#d2c8b6'; ctx.fillRect(PX, y, CW, 1); ctx.font = font(22); ctx.fillStyle = MUTED; ctx.textAlign = 'center'; ctx.fillText('写于 ' + fmtStamp(n.updated || now()), W / 2, y + 42); ctx.textAlign = 'left'; }
-    return y + 88;
+    return y;
   }
-  let H = Math.ceil(paint(null)), sc = 2;
-  if (H * sc > 16000) sc = 1;
-  H = Math.min(H, 16000);
-  const c = document.createElement('canvas'); c.width = W * sc; c.height = H * sc;
+
+  /* ── 尺寸：至少是 4:5 的竖幅；内容少时放在版面视觉中心（略偏上） */
+  const TOP = 60, IN_T = 70, IN_B = 116, SEAL_S = 60, CAP = 64;
+  const contentH = body(null, 0);
+  const minPlate = Math.round(W * 1.25) - TOP - CAP - 44;
+  const plateH = Math.max(contentH + IN_T + IN_B, minPlate), H = TOP + plateH + CAP + 44;
+  const yContent = TOP + Math.max(IN_T, Math.round((plateH - IN_B - contentH) * 0.42 + IN_T * 0.3));
+  let sc = 3; if (H * sc > 15000) sc = 2; if (H * sc > 15000) sc = 1;
+  const Hc = Math.min(H, Math.floor(15000 / sc));
+  const c = document.createElement('canvas'); c.width = W * sc; c.height = Hc * sc;
   const ctx = c.getContext('2d'); ctx.scale(sc, sc); ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#fdfbf5'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#6b4d39'; ctx.fillRect(0, 0, W, 14);
-  paint(ctx);
+
+  // 纸：底色 + 细颗粒 + 几根纤维 + 很淡的四角暗
+  ctx.fillStyle = PAPER; ctx.fillRect(0, 0, W, H);
+  const tile = document.createElement('canvas'); tile.width = tile.height = 180;
+  const tc = tile.getContext('2d'), img = tc.createImageData(180, 180);
+  for (let i = 0; i < img.data.length; i += 4) { const v = rnd(), dark = v < 0.32; img.data[i] = img.data[i + 1] = img.data[i + 2] = dark ? 70 : 255; img.data[i + 3] = Math.round(dark ? (0.32 - v) * 34 : (v - 0.32) * 26); }
+  tc.putImageData(img, 0, 0);
+  ctx.save(); ctx.scale(1 / sc, 1 / sc); ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(0, 0, W * sc, H * sc); ctx.restore();
+  ctx.save(); ctx.lineWidth = 0.6;
+  for (let i = 0; i < Math.round(W * H / 12000); i++) {
+    const x = rnd() * W, y = rnd() * H, a = rnd() * Math.PI * 2, l = 6 + rnd() * 18;
+    ctx.strokeStyle = rnd() < 0.45 ? `rgba(120,98,70,${0.035 + rnd() * 0.05})` : `rgba(255,255,255,${0.12 + rnd() * 0.12})`;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + Math.cos(a + 0.6) * l / 2, y + Math.sin(a + 0.6) * l / 2, x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke();
+  }
+  ctx.restore();
+  const vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.hypot(W, H) * 0.62);
+  vg.addColorStop(0, 'rgba(90,70,40,0)'); vg.addColorStop(1, 'rgba(90,70,40,.05)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+  // 版痕：版面略深，上、左边缘内侧有阴影，下、右外侧一道亮边
+  const px = M, py = TOP, pw = W - 2 * M, ph = plateH, rr = 5;
+  const rect = (x, y, w, h, r) => { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); };
+  rect(px, py, pw, ph, rr); ctx.fillStyle = 'rgba(110,88,58,.03)'; ctx.fill();
+  ctx.save(); rect(px, py, pw, ph, rr); ctx.clip();
+  ctx.shadowColor = 'rgba(60,42,22,.30)'; ctx.shadowBlur = 7; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2.5;
+  ctx.strokeStyle = PAPER; ctx.lineWidth = 24; rect(px - 12, py - 12, pw + 24, ph + 24, rr + 12); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(px + pw + 1, py + 6); ctx.lineTo(px + pw + 1, py + ph + 1); ctx.lineTo(px + 6, py + ph + 1); ctx.stroke();
+  rect(px, py, pw, ph, rr); ctx.strokeStyle = 'rgba(80,60,36,.20)'; ctx.lineWidth = 0.8; ctx.stroke();
+
+  // 正文：墨色边缘稍软一点
+  ctx.save(); ctx.shadowColor = 'rgba(35,30,25,.35)'; ctx.shadowBlur = sc * 0.45;
+  const yEnd = body(ctx, yContent);
+  ctx.restore();
+
+  // 朱印：白文四字，右列先读；边缘和字口有残破，略带旋转，用正片叠底印在纸上
+  const yr = (n.day ? parts(dayNum(n.day)).y : at.getFullYear());
+  const gz = '甲乙丙丁戊己庚辛壬癸'[((yr - 4) % 10 + 10) % 10] + '子丑寅卯辰巳午未申酉戌亥'[((yr - 4) % 12 + 12) % 12];
+  const chars = [gz[0], gz[1], '手', '记'], S = SEAL_S, sk = document.createElement('canvas'); sk.width = sk.height = S * sc;
+  const sx = sk.getContext('2d'); sx.scale(sc, sc);
+  sx.fillStyle = SEAL; sx.beginPath(); if (sx.roundRect) sx.roundRect(0.5, 0.5, S - 1, S - 1, 3); else sx.rect(0.5, 0.5, S - 1, S - 1); sx.fill();
+  sx.globalCompositeOperation = 'destination-out'; sx.textAlign = 'center'; sx.textBaseline = 'middle'; sx.font = `700 ${Math.round(S * 0.36)}px ${SERIF}`;
+  const cell = (S - 10) / 2;
+  [[1, 0], [1, 1], [0, 0], [0, 1]].forEach(([col, row], i) => sx.fillText(chars[i], 5 + cell * col + cell / 2, 5 + cell * row + cell / 2 + 1));
+  for (let i = 0; i < 7; i++) { const x = rnd() * S, y = rnd() * S, r = 7 + rnd() * 12, g = sx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(0,0,0,${0.06 + rnd() * 0.1})`); g.addColorStop(1, 'rgba(0,0,0,0)'); sx.globalAlpha = 1; sx.fillStyle = g; sx.fillRect(x - r, y - r, 2 * r, 2 * r); }      // 印泥不匀：边缘柔和的浅斑
+  for (let i = 0; i < 70; i++) { sx.globalAlpha = 0.2 + rnd() * 0.35; sx.beginPath(); sx.arc(rnd() * S, rnd() * S, 0.2 + rnd() * 0.35, 0, 7); sx.fill(); }
+  for (let i = 0; i < 18; i++) { const e = Math.floor(rnd() * 4), t = rnd() * S; sx.globalAlpha = 1; sx.beginPath(); sx.arc(e === 0 ? t : e === 1 ? S : e === 2 ? t : 0, e === 0 ? 0 : e === 1 ? t : e === 2 ? S : t, 0.5 + rnd() * 1.1, 0, 7); sx.fill(); }      // 边缘残破
+  const sealX = poem ? W / 2 + CW / 2 - S + 6 : M + PAD + CW - S, sealY = Math.min(py + ph - S - 34, Math.max(yEnd + 26, py + ph - IN_B + 20));
+  ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.9; ctx.translate(sealX + S / 2, sealY + S / 2); ctx.rotate(-0.035); ctx.drawImage(sk, -S / 2, -S / 2, S, S); ctx.restore();
+
+  // 版外的铅笔小字：左边是第几篇，右边是日期（罗马数字记月份）
+  const all = live(data.notes).filter(x => x.text.trim()).sort((a, b) => (a.created || a.updated) - (b.created || b.updated));
+  const no = (all.findIndex(x => x.id === n.id) + 1) || all.length + 1;
+  const ROM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  const dateS = n.day ? (p => `${p.d}. ${ROM[p.m - 1]}. ${p.y}`)(parts(dayNum(n.day))) : `${at.getDate()}. ${ROM[at.getMonth()]}. ${at.getFullYear()}`;
+  const cy = py + ph + 30;
+  ctx.font = font(17, {latin:1, i:1}); ctx.fillStyle = LEAD;
+  ctx.textAlign = 'left'; ctx.fillText(`No. ${no}`, px + 4, cy);
+  ctx.textAlign = 'right'; ctx.fillText(dateS, px + pw - 4, cy);
+  ctx.textAlign = 'left';
+  if (Hc < H) { ctx.fillStyle = PAPER; ctx.fillRect(0, Hc - 60, W, 60); ctx.font = font(16, {latin:1, i:1}); ctx.fillStyle = LEAD; ctx.textAlign = 'center'; ctx.fillText('（便签太长，图片只截取了前面一部分）', W / 2, Hc - 30); ctx.textAlign = 'left'; }
   return c;
 }
 const imgDlg = $('#imgDlg'); let shotBlob = null, shotName = '';
-function showImage(n){
-  noteCanvas(n).toBlob(b => {
-    if (!b) return toast('这个浏览器无法生成图片。');
-    shotBlob = b; shotName = `note-${localIso(n.updated || now())}.png`;
-    const img = $('#shotImg'); if (img.src) URL.revokeObjectURL(img.src); img.src = URL.createObjectURL(b);
-    imgDlg.showModal();
-  }, 'image/png');
+function showImage(n){                                     // 先把对话框打开，再慢慢画（高清图要零点几秒）
+  const img = $('#shotImg'), wait = $('#shotWait'), save = $('#saveImg');
+  img.hidden = true; wait.hidden = false; save.disabled = true; shotBlob = null;
+  imgDlg.showModal();
+  setTimeout(() => {
+    let cv; try { cv = noteCanvas(n); } catch (e) { imgDlg.close(); return toast('这条便签生成图片时出错了。'); }
+    cv.toBlob(b => {
+      if (!b) { imgDlg.close(); return toast('这个浏览器无法生成图片。'); }
+      shotBlob = b; shotName = `note-${localIso(n.updated || now())}.jpg`;
+      if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+      img.src = img.dataset.url = URL.createObjectURL(b);
+      img.onload = () => { img.hidden = false; wait.hidden = true; save.disabled = false; };
+    }, 'image/jpeg', 0.92);                                    // 纸纹是细颗粒，PNG 会有好几 MB；高质量 JPEG 只要一两 MB
+  }, 60);
 }
 $('#saveImg').addEventListener('click', () => { if (shotBlob) download(shotBlob, shotName); });
 
