@@ -1,7 +1,7 @@
 /* 离线缓存：页面本身和图标存一份在浏览器里，断网时也能打开。
    GitHub 等外部请求一律直连，不经过这里。更新页面后，联网打开一次就会用上新版本。 */
-const CACHE = 'xiangmu-tuijin-2026-10-12c';
-const SHELL = ['./', './index.html', './editor.js?v=2026-10-12c', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const CACHE = 'xiangmu-tuijin-2026-10-12d';
+const SHELL = ['./', './index.html', './editor.js?v=2026-10-12d', './math.js?v=2026-10-12d', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const PATHS = SHELL.map(u => u.slice(1).split('?')[0]).filter(Boolean);           // 只缓存这些文件
 
 self.addEventListener('install', e => {
