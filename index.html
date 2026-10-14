@@ -525,6 +525,8 @@ dialog::backdrop{background:rgba(52,38,24,.5)}
 .snaplist .st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .snaplist .sw{font-size:12px;color:var(--muted);white-space:nowrap}
 .shot{max-height:min(66dvh,720px);overflow:auto;padding:22px;border-radius:8px;background:#d8d1c4;box-shadow:inset 0 1px 3px rgba(60,40,20,.25)}
+.shot-opt{margin:-4px 2px 0;font-size:13px;color:var(--ink);flex-wrap:wrap}
+.shot-opt em{font-style:normal;color:var(--muted);font-size:12.5px}
 .shot-hint{min-height:1.4em;margin:-4px 2px 0;font-size:12.5px;color:var(--muted);line-height:1.4}
 .shot-hint:empty{min-height:0;margin:0}
 #copyImg.done{background:linear-gradient(#5f8f4a,#4c7a3a);border-color:#3f6a30}
@@ -1184,6 +1186,12 @@ span.tagx{padding:0 4px;font-size:.92em;line-height:inherit;border-radius:6px}
 .menu-empty{margin:0;padding:10px 12px;max-width:240px;font-size:13px;line-height:1.6;color:var(--muted)}
 .menu-sep{display:block;height:1px;margin:4px 8px;background:var(--line)}
 .menu button.danger{color:var(--accent)}
+.menu button.mcheck{display:flex;align-items:center;gap:8px}
+.menu button.mcheck::after{content:"";margin-left:auto;width:30px;height:18px;border-radius:9px;background:#d9cfbf;box-shadow:inset 0 1px 2px rgba(60,40,20,.25);transition:background .2s}
+.menu button.mcheck::before{content:"";position:absolute;top:calc(50% - 7px);right:26px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .2s var(--ease)}
+.menu button.mcheck{position:relative;padding-right:12px}
+.menu button.mcheck[aria-checked=true]::after{background:var(--accent)}
+.menu button.mcheck[aria-checked=true]::before{transform:translateX(12px)}
 /* 反向链接 */
 .backlinks{display:grid;gap:1px}
 .backlinks button{display:grid;gap:1px;margin:0 -8px;padding:6px 8px;border:0;border-radius:6px;background:none;text-align:left;cursor:pointer}
@@ -1516,6 +1524,8 @@ dialog.cmdk[open]{animation:ckIn .2s var(--ease)}
             <button role="menuitem" data-act="md">导出为 Markdown</button>
             <button role="menuitem" data-act="tpl">存为模板</button>
             <i class="menu-sep" aria-hidden="true"></i>
+            <button role="menuitemcheckbox" data-act="geo" aria-checked="true" class="mcheck">记录地点和天气</button>
+            <i class="menu-sep" aria-hidden="true"></i>
             <button role="menuitem" data-act="delete" class="danger">删除便签</button>
           </div>
         </header>
@@ -1740,13 +1750,14 @@ dialog.cmdk[open]{animation:ckIn .2s var(--ease)}
   <div class="dlg">
     <h3 id="imgTitle">便签图片</h3>
     <div class="shot"><p class="shot-wait" id="shotWait">正在生成…</p><img id="shotImg" alt="便签生成的图片预览" hidden></div>
+    <label class="check2 shot-opt" id="shotPlaceWrap" hidden><input type="checkbox" id="shotPlace" checked><span>在图片上显示地点和天气</span><em id="shotPlaceTxt"></em></label>
     <p class="shot-hint" id="shotHint" aria-live="polite"></p>
     <div class="actions"><button type="button" class="btn" data-close>关闭</button><span class="spacer"></span><button type="button" class="btn" id="shareImg" hidden>分享…</button><button type="button" class="btn" id="saveImg">保存图片</button><button type="button" class="btn primary" id="copyImg">复制图片</button></div>
   </div>
 </dialog>
 
 <noscript>这个页面需要启用 JavaScript 才能使用。</noscript>
-<script src="editor.js?v=2026-10-12l"></script>
+<script src="editor.js?v=2026-10-12m"></script>
 
 <script>
 (async () => {
@@ -1758,7 +1769,7 @@ const K_DATA = APP + '-v2', K_V1 = APP + '-v1', K_UI = APP + '-ui', K_SYNC = APP
 const GIST_FILE = APP + '.json';
 const K_TRACK = APP + '-track', TRACK_FILE = APP + '-track.json';     // 论文、申请、等回复：单独存放，旧版页面不会碰到
 const K_EXT = APP + '-ext', EXT_FILE = APP + '-ext.json';             // 侧边栏设置和后来加的功能
-const APP_VERSION = '2026-10-12l';
+const APP_VERSION = '2026-10-12m';
 const API = 'https://api.github.com';
 const DAY = 86400000, KEEP_DELETED = 90 * DAY;
 const WD = ['日','一','二','三','四','五','六'];
@@ -2872,7 +2883,7 @@ document.addEventListener('keydown', e => {                 // 第一次 Esc 离
 });
 
 /* 更多操作菜单 */
-function toggleMenu(open){ noteMenu.hidden = !open; btnMore.setAttribute('aria-expanded', String(open)); if (!outlineMenu.hidden) toggleOutline(false); if (open) noteMenu.querySelector('button').focus(); }
+function toggleMenu(open){ if (open) { const g = noteMenu.querySelector('[data-act=geo]'); if (g) g.setAttribute('aria-checked', String(geoOn())); } noteMenu.hidden = !open; btnMore.setAttribute('aria-expanded', String(open)); if (!outlineMenu.hidden) toggleOutline(false); if (open) noteMenu.querySelector('button').focus(); }
 btnMore.addEventListener('click', e => { e.stopPropagation(); toggleMenu(noteMenu.hidden); });
 document.addEventListener('click', e => { if (!noteMenu.hidden && !noteMenu.contains(e.target)) toggleMenu(false); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !noteMenu.hidden) { e.preventDefault(); toggleMenu(false); btnMore.focus(); } });
@@ -2883,6 +2894,7 @@ noteMenu.addEventListener('click', e => {
   if (act === 'delete') return deleteCur();
   if (act === 'find') { if (cm) { cm.focus(); CM.openSearchPanel(cm); } else toast('纯文本模式下请用浏览器自带的查找。'); return; }
   if (act === 'tpl') return saveAsTpl();
+  if (act === 'geo') return setGeo(!geoOn());
   if (!cur.text.trim()) return toast('这条便签还是空的。');
   const head = cur.day ? `# ${fmtLong(cur.day)}\n\n` : '';
   if (act === 'md') download(new Blob([head + cur.text + '\n'], {type:'text/markdown;charset=utf-8'}), `note-${fileStamp()}.md`);
@@ -3961,7 +3973,7 @@ if (window.ResizeObserver) new ResizeObserver(fmtFade).observe(fmt);
 
 /* ═════════ 便签：生成图片 ═════════ */
 /* 像一张版画：棉纸纹理、压出来的版痕、墨色正文、版外铅笔小字，右下角一方朱印 */
-function noteCanvas(n){
+function noteCanvas(n, opt = {}){
   const cs = getComputedStyle(document.documentElement);
   const SERIF = cs.getPropertyValue('--serif').trim(), MONO = cs.getPropertyValue('--mono').trim();
   const LATIN = '"Baskerville","Iowan Old Style","Palatino","Palatino Linotype","Book Antiqua",Georgia,serif';
@@ -4211,7 +4223,7 @@ function noteCanvas(n){
   ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.9; ctx.translate(sealX + S / 2, sealY + S / 2); ctx.rotate(-0.035); ctx.drawImage(sk, -S / 2, -S / 2, S, S); ctx.restore();
 
   // 版外的小字：左边是在哪里写的（地点和天气），右边是日期（罗马数字记月份）
-  const pl = placeOf(n), plS = pl ? pl.name + (pl.wx ? `　${pl.wx.t}${pl.wx.c != null ? ' ' + pl.wx.c + '°' : ''}` : '') : '';
+  const pl = opt.place !== false && geoOn() ? placeOf(n) : null, plS = pl ? pl.name + (pl.wx ? `　${pl.wx.t}${pl.wx.c != null ? ' ' + pl.wx.c + '°' : ''}` : '') : '';
   const ROM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
   const dateS = dayIso ? (p => `${p.d}. ${ROM[p.m - 1]}. ${p.y}`)(parts(dayNum(dayIso))) : `${at.getDate()}. ${ROM[at.getMonth()]}. ${at.getFullYear()}`;
   const cy = py + ph + 30;
@@ -4244,20 +4256,34 @@ async function copyShot(auto){
     return true;
   } catch (e) { if (!auto) { shotState('ready'); toast('没能复制。浏览器可能没有给剪贴板权限，可以用“保存图片”。'); } return false; }
 }
+let shotNote = null;
+function shotPlaceUi(n){
+  const p = geoOn() && placeOf(n), w = $('#shotPlaceWrap');
+  w.hidden = !p; if (!p) return;
+  $('#shotPlace').checked = ui.imgPlace !== false; $('#shotPlaceTxt').textContent = placeLabel(p);
+}
 function showImage(n){                                     // 先把对话框打开，再慢慢画
+  shotNote = n;
+  $('#shareImg').hidden = !canShareFiles();
+  $('#shotPlaceWrap').hidden = true;
+  imgDlg.showModal();
+  renderShot(n, true);
+}
+function renderShot(n, first){
   const img = $('#shotImg'), wait = $('#shotWait');
   img.hidden = true; wait.hidden = false; shotBlob = null; shotPng = null; const seq = ++shotSeq;
-  $('#shareImg').hidden = !canShareFiles(); shotState('wait');
-  imgDlg.showModal();
+  shotState('wait');
   (async () => {
-    if (!placeOf(n) && isFresh(n) && !ui.geoNo && 'geolocation' in navigator) {        // 今天写的、还没有地点：先定位一次（最多等 9 秒）
+    if (first && geoOn() && !placeOf(n) && isFresh(n) && !ui.geoNo && 'geolocation' in navigator) {        // 今天写的、还没有地点：先定位一次（最多等 9 秒）
       wait.textContent = '正在定位…';
       await Promise.race([capturePlace(n, {ask:true}), new Promise(r => setTimeout(r, 9000))]);
     }
+    if (seq !== shotSeq) return;
+    shotPlaceUi(n);
     wait.textContent = '正在生成…';
     await new Promise(r => setTimeout(r, 40));
-    if (!imgDlg.open) return;
-    let cv; try { cv = noteCanvas(n); } catch (e) { imgDlg.close(); return toast('这条便签生成图片时出错了。'); }
+    if (!imgDlg.open || seq !== shotSeq) return;
+    let cv; try { cv = noteCanvas(n, {place:geoOn() && ui.imgPlace !== false}); } catch (e) { imgDlg.close(); return toast('这条便签生成图片时出错了。'); }
     cv.toBlob(b => {
       if (!b) { imgDlg.close(); return toast('这个浏览器无法生成图片。'); }
       shotBlob = b; shotName = `note-${fileStamp()}.jpg`;      // 精确到秒，一天导出几张也不会重名
@@ -4269,6 +4295,7 @@ function showImage(n){                                     // 先把对话框打
   })();
 }
 $('#saveImg').addEventListener('click', () => { if (shotBlob) download(shotBlob, shotName); });
+$('#shotPlace').addEventListener('change', e => { ui.imgPlace = e.target.checked; saveUI(); if (shotNote) renderShot(shotNote, false); });   // 只影响图片，便签里照样记着
 $('#copyImg').addEventListener('click', () => copyShot(false));
 $('#shareImg').addEventListener('click', async () => {
   if (!shotBlob) return;
@@ -7960,6 +7987,15 @@ const K_GEO = APP + '-geo';                                     // 这台设备�
 const WMO = c => c === 0 || c === 1 ? '晴' : c === 2 ? '多云' : c === 3 ? '阴' : c === 45 || c === 48 ? '雾' : c >= 51 && c <= 57 ? '毛毛雨'
   : c === 61 || c === 80 ? '小雨' : c === 63 || c === 81 ? '中雨' : c === 65 || c === 82 ? '大雨' : c === 66 || c === 67 ? '冻雨'
   : c === 71 || c === 85 ? '小雪' : c === 73 ? '中雪' : c === 75 || c === 86 ? '大雪' : c === 77 ? '雪粒' : c >= 95 ? '雷雨' : '';
+function geoOn(){ const s = data.settings.find(x => x.id === 'geo' && !x.deleted); return !s || s.on !== false; }
+function setGeo(on){
+  const t = now(), i = data.settings.findIndex(x => x.id === 'geo'), o = normSetting({id:'geo', on:!!on, created:i < 0 ? t : data.settings[i].created || t, updated:t});
+  if (i < 0) data.settings.push(o); else adopt(data.settings[i], o);
+  if (on) { delete ui.geoNo; saveUI(); placeTried.clear(); }
+  changed(); renderPlace();
+  toast(on ? '已打开：新写的便签会自动记下地点和天气。' : '已关闭：不再定位，便签和图片上也不显示地点。以前记下的还保存着，重新打开就会显示。');
+  if (on && cur) autoPlace(cur);
+}
 function placeOf(n){ if (!n) return null; for (const p of data.places) if (p.id === n.id && !p.deleted) return p; return null; }
 function isFresh(n){ return !!n && (n.day ? n.day === todayIso() : now() - (n.created || now()) < 12 * 3600e3); }
 const placeLabel = p => p.name + (p.wx ? ` · ${p.wx.t}${p.wx.c != null ? ' ' + p.wx.c + '°' : ''}` : '');
@@ -7996,7 +8032,7 @@ async function lookupPlace(force){
 }
 /* ask：可以弹出浏览器的定位权限询问（用户点了按钮时）；不然只在已经允许过的情况下悄悄定位 */
 async function capturePlace(n, opt = {}){
-  if (!n || !('geolocation' in navigator) || placeBusy.has(n.id)) return null;
+  if (!n || !geoOn() || !('geolocation' in navigator) || placeBusy.has(n.id)) return null;
   const st = await geoPerm();
   if (st === 'denied') { geoErr = '浏览器不允许这个网页定位。可以在浏览器的网站设置里打开“位置”权限。'; return null; }
   if (st !== 'granted' && !opt.ask) return null;
@@ -8012,13 +8048,13 @@ async function capturePlace(n, opt = {}){
     return null;
   } finally { placeBusy.delete(n.id); renderPlace(); }
 }
-function autoPlace(n){                                         // 新写的便签：如果已经允许过定位，就悄悄记下在哪写的
-  if (!n || !n.text.trim() || placeOf(n) || placeTried.has(n.id) || !isFresh(n)) return;
-  placeTried.add(n.id); capturePlace(n);
+function autoPlace(n){                                         // 今天新写的便签：一写字就记下在哪写的（第一次会问浏览器能不能定位；拒绝后就不再自动问）
+  if (!n || !geoOn() || !n.text.trim() || placeOf(n) || placeTried.has(n.id) || !isFresh(n)) return;
+  placeTried.add(n.id); capturePlace(n, {ask:!ui.geoNo});
 }
 function renderPlace(){
   const b = $('#notePlace'); if (!b) return;
-  if (!cur) { b.hidden = true; return; }
+  if (!cur || !geoOn()) { b.hidden = true; return; }
   const p = placeOf(cur), busy = placeBusy.has(cur.id);
   b.hidden = false; b.classList.toggle('empty', !p && !busy); b.classList.toggle('busy', busy);
   b.lastElementChild.textContent = busy ? '正在定位…' : p ? placeLabel(p) : '';
@@ -8048,6 +8084,7 @@ function extraCommands(add){
     add('导入 BibTeX', '从 ADS 复制粘贴', 'book', () => openDrawer('bibin', null, {inst:insts('reading')[0]}), 'bibtex ads import daoru wenxian');
     const n = live(data.reading).length; if (n) add('导出全部文献为 .bib', `${n} 篇`, 'book', exportAllBib, 'bibtex export daochu bib');
   }
+  add(geoOn() ? '关闭：记录地点和天气' : '打开：记录地点和天气', geoOn() ? '现在是开着的' : '现在是关着的', 'globe', () => setGeo(!geoOn()), 'location weather didian tianqi dingwei');
   add('日历订阅', icsOn() ? '已开启' : '让手机、电脑的日历提醒截止和待办', 'calcheck', openIcs, 'ics calendar rili dingyue tixing');
 }
 
