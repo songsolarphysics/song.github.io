@@ -525,6 +525,16 @@ dialog::backdrop{background:rgba(52,38,24,.5)}
 .snaplist .st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .snaplist .sw{font-size:12px;color:var(--muted);white-space:nowrap}
 .shot{max-height:min(66dvh,720px);overflow:auto;padding:22px;border-radius:8px;background:#d8d1c4;box-shadow:inset 0 1px 3px rgba(60,40,20,.25)}
+.shot-hint{min-height:1.4em;margin:-4px 2px 0;font-size:12.5px;color:var(--muted);line-height:1.4}
+.shot-hint:empty{min-height:0;margin:0}
+#copyImg.done{background:linear-gradient(#5f8f4a,#4c7a3a);border-color:#3f6a30}
+#imgDlg .actions .btn{min-width:0}
+@media (max-width:520px){
+  #imgDlg .actions{flex-wrap:wrap}
+  #imgDlg .actions .spacer{display:none}
+  #imgDlg .actions .btn{flex:1 1 0}
+  #imgDlg .actions #copyImg{order:-1;flex:1 1 100%;height:42px;font-size:15px}
+}
 .shot-wait{margin:0;padding:140px 0;text-align:center;color:#6c6358;font-size:13px}
 .shot img{display:block;width:100%;animation:fadeIn .3s;box-shadow:0 1px 2px rgba(50,35,20,.25),0 12px 28px -12px rgba(50,35,20,.45)}
 
@@ -1424,6 +1434,20 @@ dialog.cmdk[open]{animation:ckIn .2s var(--ease)}
 .tpl-chip .tpl-x:hover{color:var(--now)}
 .tpl-bar:not([hidden]){animation:fadeUp .25s var(--ease)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(4px)}}
+/* 12k：便签的地点、模板“更多” */
+.meta-l{display:inline-flex;align-items:center;min-width:0;gap:0}
+.place-chip{display:inline-flex;align-items:center;gap:4px;min-width:0;max-width:240px;height:22px;margin-left:8px;padding:0 8px 0 5px;border:0;border-radius:11px;background:none;color:var(--muted);font-size:12.5px;transition:background .15s,color .15s,opacity .15s}
+.place-chip:hover{background:#efe6d6;color:var(--ink)}
+.place-chip svg{flex:none;width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.place-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.place-chip.empty{opacity:.5;padding-right:5px}
+.place-chip.empty:hover{opacity:1}
+.place-chip.empty span::after{content:"添加地点";font-size:12px}
+.place-chip.empty span:not(:empty)::after{content:none}
+.place-chip.busy{animation:plPulse 1.1s ease-in-out infinite}
+@keyframes plPulse{50%{opacity:.45}}
+.tpl-more{height:28px;padding:0 10px;border:0;background:none;color:var(--muted);font-size:12.5px;text-decoration:underline;text-underline-offset:3px}
+.tpl-more:hover{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -1497,7 +1521,7 @@ dialog.cmdk[open]{animation:ckIn .2s var(--ease)}
         </header>
         <div class="paper" id="paper">
           <div class="note-meta">
-            <span id="noteWhen"></span>
+            <span class="meta-l"><span id="noteWhen"></span><button type="button" class="place-chip" id="notePlace" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 14.6s-4.6-4.3-4.6-8A4.6 4.6 0 0 1 12.6 6.6c0 3.7-4.6 8-4.6 8z"/><circle cx="8" cy="6.5" r="1.7"/></svg><span></span></button></span>
             <span class="metasel">
               <label class="proj" id="folderWrap">文件夹<select id="noteFolder"></select></label>
               <label class="proj" id="projWrap">项目<select id="noteGroup"></select></label>
@@ -1716,12 +1740,13 @@ dialog.cmdk[open]{animation:ckIn .2s var(--ease)}
   <div class="dlg">
     <h3 id="imgTitle">便签图片</h3>
     <div class="shot"><p class="shot-wait" id="shotWait">正在生成…</p><img id="shotImg" alt="便签生成的图片预览" hidden></div>
-    <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>关闭</button><button type="button" class="btn primary" id="saveImg">保存图片</button></div>
+    <p class="shot-hint" id="shotHint" aria-live="polite"></p>
+    <div class="actions"><button type="button" class="btn" data-close>关闭</button><span class="spacer"></span><button type="button" class="btn" id="shareImg" hidden>分享…</button><button type="button" class="btn" id="saveImg">保存图片</button><button type="button" class="btn primary" id="copyImg">复制图片</button></div>
   </div>
 </dialog>
 
 <noscript>这个页面需要启用 JavaScript 才能使用。</noscript>
-<script src="editor.js?v=2026-10-12j"></script>
+<script src="editor.js?v=2026-10-12l"></script>
 
 <script>
 (async () => {
@@ -1733,7 +1758,7 @@ const K_DATA = APP + '-v2', K_V1 = APP + '-v1', K_UI = APP + '-ui', K_SYNC = APP
 const GIST_FILE = APP + '.json';
 const K_TRACK = APP + '-track', TRACK_FILE = APP + '-track.json';     // 论文、申请、等回复：单独存放，旧版页面不会碰到
 const K_EXT = APP + '-ext', EXT_FILE = APP + '-ext.json';             // 侧边栏设置和后来加的功能
-const APP_VERSION = '2026-10-12j';
+const APP_VERSION = '2026-10-12l';
 const API = 'https://api.github.com';
 const DAY = 86400000, KEEP_DELETED = 90 * DAY;
 const WD = ['日','一','二','三','四','五','六'];
@@ -2093,6 +2118,16 @@ function normBib(b){
   }
   return base(b, o);
 }
+function normPlace(p){
+  if (!p || typeof p.id !== 'string' || (typeof p.name !== 'string' && !p.deleted)) return null;
+  const o = {id:Sx(p.id, 40)};
+  if (!p.deleted) {
+    o.name = Sx(p.name, 40).trim(); if (!o.name) return null;
+    const w = p.wx && typeof p.wx === 'object' ? p.wx : null;
+    if (w && typeof w.t === 'string' && w.t) { o.wx = {t:Sx(w.t, 8)}; if (isFinite(Number(w.c)) && w.c !== null && w.c !== '') o.wx.c = Math.round(Number(w.c)); }
+  }
+  return base(p, o);
+}
 const MOD_TYPES = ['papers', 'apps', 'waits', 'reading', 'trips', 'habits', 'focus', 'counts', 'review', 'links', 'ledger', 'kanban', 'metric'];
 function normPref(p){
   if (!p || typeof p.id !== 'string') return null;
@@ -2117,7 +2152,7 @@ function normPref(p){
   return o;
 }
 const XNORM = [['prefs', normPref], ['reading', normReading], ['trips', normTrip], ['habits', normHabit], ['focus', normFocus], ['counts', normCount],
-  ['reviews', normReview], ['links', normLinkItem], ['ledger', normLedger], ['cards', normCard], ['metrics', normMetric], ['settings', normSetting], ['tpls', normTpl], ['bibs', normBib]];
+  ['reviews', normReview], ['links', normLinkItem], ['ledger', normLedger], ['cards', normCard], ['metrics', normMetric], ['settings', normSetting], ['tpls', normTpl], ['bibs', normBib], ['places', normPlace]];
 const RESERVED = new Set(['app', 'kind', 'version', 'savedAt', 'tasks', 'notes', 'log', 'todos', 'folders', 'pinned', ...TNORM.map(x => x[0]), ...XNORM.map(x => x[0])]);
 const normAny = x => x && typeof x === 'object' && typeof x.id === 'string' ? JSON.parse(JSON.stringify(x)) : null;   // 以后版本才有的集合：原样保留
 function normLog(l){
@@ -2786,7 +2821,7 @@ function renderMeta(){
   $('#noteWhen').textContent = cur.updated && cur.text.trim() ? `${when} · ${charCount(cur.text)} 字` : '新便签';
 }
 function renderNote(load){
-  renderMeta();
+  renderMeta(); renderPlace();
   const dt = $('#dayTitle'); dt.hidden = !cur.day; dt.textContent = cur.day ? fmtLong(cur.day) : '';
   const sel = $('#noteGroup'), ps = projects();
   if (cur.group && !ps.includes(cur.group)) ps.push(cur.group);
@@ -2815,7 +2850,7 @@ function commitText(v){
     if (i < 0) data.notes.push(cur); else if (data.notes[i] !== cur) data.notes[i] = cur;
   } else if (attached(cur)) cur.deleted = true;
   curSeen = cur.updated;
-  changed(); renderMeta(); listSoon(); linkSoon(); tplSync();
+  changed(); renderMeta(); listSoon(); linkSoon(); tplSync(); autoPlace(cur);
   if (cur.day && hadDay !== hasEntry(cur.day)) { const c = document.querySelector(`.hd.day[data-day="${cur.day}"]`); if (c) c.classList.toggle('has', !hadDay); }
 }
 function touchCur(){ if (attached(cur)) { cur.updated = now(); curSeen = cur.updated; changed(); renderList(); } }
@@ -2850,7 +2885,7 @@ noteMenu.addEventListener('click', e => {
   if (act === 'tpl') return saveAsTpl();
   if (!cur.text.trim()) return toast('这条便签还是空的。');
   const head = cur.day ? `# ${fmtLong(cur.day)}\n\n` : '';
-  if (act === 'md') download(new Blob([head + cur.text + '\n'], {type:'text/markdown;charset=utf-8'}), `note-${localIso(cur.updated || now())}.md`);
+  if (act === 'md') download(new Blob([head + cur.text + '\n'], {type:'text/markdown;charset=utf-8'}), `note-${fileStamp()}.md`);
   else if (act === 'print') printMd(head + cur.text, cur.day ? fmtLong(cur.day) : noteTitle(cur));
   else if (act === 'copy') copyRich(head + cur.text);
   else showImage(cur);
@@ -4007,11 +4042,33 @@ function noteCanvas(n){
   for (const b of blocks) if (typeof b.s === 'string') b.s = mathIn(b.s);
   while (blocks.length && blocks[0].t === 'gap') blocks.shift();
   while (blocks.length && blocks[blocks.length - 1].t === 'gap') blocks.pop();
-  // 标题：每日便签用日期；其他便签用第一行
-  let title = null, sub = '';
-  const at = new Date(n.day ? dayNum(n.day) * DAY + new Date().getTimezoneOffset() * 60000 : (n.created || n.updated || now()));
+  // 没填的模板内容不画：空的列表项、空引用、全空的表格行，以及下面什么都没有的小标题
+  const emptyB = b => (['ul', 'ol', 'todo', 'quote'].includes(b.t) && !String(b.s || '').trim()) || (b.t === 'p' && /^([-*+]|\d+[.)]|>)$/.test(b.s));
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const b = blocks[i];
+    if (emptyB(b)) { blocks.splice(i, 1); continue; }
+    if (b.t === 'table') { b.rows = b.rows.filter((r, k) => k < 2 || rowCells(r).some(c => c.text.trim())); if (b.rows.length < 3) blocks.splice(i, 1); }
+  }
+  const head0 = !n.day && blocks.length && (blocks[0].t === 'h' || blocks[0].t === 'p') ? 1 : 0;      // 第一行要当标题，留着
+  for (let i = blocks.length - 1; i >= head0; i--) {
+    if (blocks[i].t !== 'h') continue;
+    let has = false;
+    for (let j = i + 1; j < blocks.length; j++) { const b = blocks[j]; if (b.t === 'h' && b.level <= blocks[i].level) break; if (b.t !== 'gap' && b.t !== 'hr') { has = true; break; } }
+    if (!has) blocks.splice(i, 1);
+  }
+  for (let i = blocks.length - 1; i > 0; i--) if (blocks[i].t === 'gap' && blocks[i - 1].t === 'gap') blocks.splice(i, 1);
+  while (blocks.length && blocks[blocks.length - 1].t === 'hr') blocks.pop();
+  while (blocks.length && blocks[blocks.length - 1].t === 'gap') blocks.pop();
+  // 标题：每日便签用日期；第一行只是一个日期时也这样排；其他便签用第一行
+  let title = null, sub = '', dayIso = n.day || '';
+  if (!dayIso && blocks.length && (blocks[0].t === 'h' || blocks[0].t === 'p')) {
+    const m = /^(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日(?:\s*(?:周|星期)[一二三四五六日天])?$/.exec(plain(blocks[0].s));
+    const iso = m && `${m[1]}-${pad2(+m[2])}-${pad2(+m[3])}`;
+    if (iso && okDate(iso)) { dayIso = iso; blocks.shift(); }
+  }
+  const at = new Date(dayIso ? dayNum(dayIso) * DAY + new Date().getTimezoneOffset() * 60000 : (n.created || n.updated || now()));
   const CN = '〇一二三四五六七八九', cnNum = x => x <= 10 ? (x === 10 ? '十' : CN[x]) : x < 20 ? '十' + CN[x % 10] : CN[Math.floor(x / 10)] + '十' + (x % 10 ? CN[x % 10] : '');
-  if (n.day) { const p = parts(dayNum(n.day)); title = inline(`${cnNum(p.m)}月${cnNum(p.d)}日`); sub = `${String(p.y).split('').map(d => CN[d]).join('')}年　星期${'日一二三四五六'[p.w]}`; }
+  if (dayIso) { const p = parts(dayNum(dayIso)); title = inline(`${cnNum(p.m)}月${cnNum(p.d)}日`); sub = `${String(p.y).split('').map(d => CN[d]).join('')}年　星期${'日一二三四五六'[p.w]}`; }
   else if (blocks.length && (blocks[0].t === 'h' || blocks[0].t === 'p')) title = inline(blocks.shift().s);
   while (blocks.length && blocks[0].t === 'gap') blocks.shift();
   // 很短、没有列表表格的便签：居中，像一首诗
@@ -4099,7 +4156,7 @@ function noteCanvas(n){
   const minPlate = Math.round(W * 1.25) - TOP - CAP - 44;
   const plateH = Math.max(contentH + IN_T + IN_B, minPlate), H = TOP + plateH + CAP + 44;
   const yContent = TOP + Math.max(IN_T, Math.round((plateH - IN_B - contentH) * 0.42 + IN_T * 0.3));
-  let sc = 3; if (H * sc > 15000) sc = 2; if (H * sc > 15000) sc = 1;
+  let sc = 2; if (H * sc > 15000) sc = 1;             // 两倍清晰度：手机上看、打印成明信片都够
   const Hc = Math.min(H, Math.floor(15000 / sc));
   const c = document.createElement('canvas'); c.width = W * sc; c.height = Hc * sc;
   const ctx = c.getContext('2d'); ctx.scale(sc, sc); ctx.textBaseline = 'middle';
@@ -4110,7 +4167,8 @@ function noteCanvas(n){
   const tc = tile.getContext('2d'), img = tc.createImageData(180, 180);
   for (let i = 0; i < img.data.length; i += 4) { const v = rnd(), dark = v < 0.32; img.data[i] = img.data[i + 1] = img.data[i + 2] = dark ? 70 : 255; img.data[i + 3] = Math.round(dark ? (0.32 - v) * 34 : (v - 0.32) * 26); }
   tc.putImageData(img, 0, 0);
-  ctx.save(); ctx.scale(1 / sc, 1 / sc); ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(0, 0, W * sc, H * sc); ctx.restore();
+  // 颗粒放大两倍再柔化：看起来还是纸，但 JPEG 好压得多（逐像素的噪点会让文件大好几倍）
+  ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.scale(2, 2); ctx.globalAlpha = 0.78; ctx.fillStyle = ctx.createPattern(tile, 'repeat'); ctx.fillRect(0, 0, W, H); ctx.restore();
   ctx.save(); ctx.lineWidth = 0.6;
   for (let i = 0; i < Math.round(W * H / 12000); i++) {
     const x = rnd() * W, y = rnd() * H, a = rnd() * Math.PI * 2, l = 6 + rnd() * 18;
@@ -4138,7 +4196,7 @@ function noteCanvas(n){
   ctx.restore();
 
   // 朱印：白文四字，右列先读；边缘和字口有残破，略带旋转，用正片叠底印在纸上
-  const yr = (n.day ? parts(dayNum(n.day)).y : at.getFullYear());
+  const yr = (dayIso ? parts(dayNum(dayIso)).y : at.getFullYear());
   const gz = '甲乙丙丁戊己庚辛壬癸'[((yr - 4) % 10 + 10) % 10] + '子丑寅卯辰巳午未申酉戌亥'[((yr - 4) % 12 + 12) % 12];
   const chars = [gz[0], gz[1], '手', '记'], S = SEAL_S, sk = document.createElement('canvas'); sk.width = sk.height = S * sc;
   const sx = sk.getContext('2d'); sx.scale(sc, sc);
@@ -4152,36 +4210,71 @@ function noteCanvas(n){
   const sealX = poem ? W / 2 + CW / 2 - S + 6 : M + PAD + CW - S, sealY = Math.min(py + ph - S - 34, Math.max(yEnd + 26, py + ph - IN_B + 20));
   ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.9; ctx.translate(sealX + S / 2, sealY + S / 2); ctx.rotate(-0.035); ctx.drawImage(sk, -S / 2, -S / 2, S, S); ctx.restore();
 
-  // 版外的铅笔小字：左边是第几篇，右边是日期（罗马数字记月份）
-  const all = live(data.notes).filter(x => x.text.trim()).sort((a, b) => (a.created || a.updated) - (b.created || b.updated));
-  const no = (all.findIndex(x => x.id === n.id) + 1) || all.length + 1;
+  // 版外的小字：左边是在哪里写的（地点和天气），右边是日期（罗马数字记月份）
+  const pl = placeOf(n), plS = pl ? pl.name + (pl.wx ? `　${pl.wx.t}${pl.wx.c != null ? ' ' + pl.wx.c + '°' : ''}` : '') : '';
   const ROM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
-  const dateS = n.day ? (p => `${p.d}. ${ROM[p.m - 1]}. ${p.y}`)(parts(dayNum(n.day))) : `${at.getDate()}. ${ROM[at.getMonth()]}. ${at.getFullYear()}`;
+  const dateS = dayIso ? (p => `${p.d}. ${ROM[p.m - 1]}. ${p.y}`)(parts(dayNum(dayIso))) : `${at.getDate()}. ${ROM[at.getMonth()]}. ${at.getFullYear()}`;
   const cy = py + ph + 30;
   ctx.font = font(17, {latin:1, i:1}); ctx.fillStyle = LEAD;
-  ctx.textAlign = 'left'; ctx.fillText(`No. ${no}`, px + 4, cy);
+  if (plS) { ctx.font = font(16); ctx.textAlign = 'left'; let s = plS; probe.font = ctx.font; while (s.length > 2 && probe.measureText(s).width > pw / 2 - 16) s = s.slice(0, -2) + '…'; ctx.fillText(s, px + 4, cy); ctx.font = font(17, {latin:1, i:1}); }
   ctx.textAlign = 'right'; ctx.fillText(dateS, px + pw - 4, cy);
   ctx.textAlign = 'left';
   if (Hc < H) { ctx.fillStyle = PAPER; ctx.fillRect(0, Hc - 60, W, 60); ctx.font = font(16, {latin:1, i:1}); ctx.fillStyle = LEAD; ctx.textAlign = 'center'; ctx.fillText('（便签太长，图片只截取了前面一部分）', W / 2, Hc - 30); ctx.textAlign = 'left'; }
   return c;
 }
 const imgDlg = $('#imgDlg'); let shotBlob = null, shotName = '';
-function showImage(n){                                     // 先把对话框打开，再慢慢画（高清图要零点几秒）
-  const img = $('#shotImg'), wait = $('#shotWait'), save = $('#saveImg');
-  img.hidden = true; wait.hidden = false; save.disabled = true; shotBlob = null;
+const fileStamp = () => { const d = new Date(); return `${localIso(d.getTime())}-${pad2(d.getHours())}${pad2(d.getMinutes())}${pad2(d.getSeconds())}`; };
+let shotPng = null, shotSeq = 0;
+const canShareFiles = () => { try { return !!(navigator.canShare && navigator.canShare({files:[new File([new Blob(['x'], {type:'image/jpeg'})], 'x.jpg', {type:'image/jpeg'})]})); } catch (_) { return false; } };
+function shotState(st){
+  const copy = $('#copyImg'), hint = $('#shotHint'), ready = st !== 'wait';
+  for (const id of ['saveImg', 'copyImg', 'shareImg']) $('#' + id).disabled = !ready;
+  copy.textContent = st === 'copied' ? '已复制' : '复制图片'; copy.classList.toggle('done', st === 'copied');
+  hint.textContent = st === 'copied' ? '已经复制到剪贴板，可以直接粘贴到微信、邮件或聊天窗口里。' : st === 'nocopy' ? '这个浏览器不能直接复制图片，可以用“保存图片”或“分享”。' : '';
+}
+/* 剪贴板只收 PNG；Safari 要求在点击里直接交给它一个 Promise，所以先传 Promise，不支持时再传做好的图片 */
+async function copyShot(auto){
+  if (!shotPng || !navigator.clipboard || !navigator.clipboard.write || !window.ClipboardItem) { if (!auto) shotState('nocopy'); return false; }
+  const seq = shotSeq;
+  try {
+    try { await navigator.clipboard.write([new ClipboardItem({'image/png':shotPng})]); }
+    catch (e) { if (e && e.name === 'NotAllowedError') throw e; await navigator.clipboard.write([new ClipboardItem({'image/png':await shotPng})]); }
+    if (seq === shotSeq && imgDlg.open) shotState('copied');
+    if (!auto) toast('已复制图片');
+    return true;
+  } catch (e) { if (!auto) { shotState('ready'); toast('没能复制。浏览器可能没有给剪贴板权限，可以用“保存图片”。'); } return false; }
+}
+function showImage(n){                                     // 先把对话框打开，再慢慢画
+  const img = $('#shotImg'), wait = $('#shotWait');
+  img.hidden = true; wait.hidden = false; shotBlob = null; shotPng = null; const seq = ++shotSeq;
+  $('#shareImg').hidden = !canShareFiles(); shotState('wait');
   imgDlg.showModal();
-  setTimeout(() => {
+  (async () => {
+    if (!placeOf(n) && isFresh(n) && !ui.geoNo && 'geolocation' in navigator) {        // 今天写的、还没有地点：先定位一次（最多等 9 秒）
+      wait.textContent = '正在定位…';
+      await Promise.race([capturePlace(n, {ask:true}), new Promise(r => setTimeout(r, 9000))]);
+    }
+    wait.textContent = '正在生成…';
+    await new Promise(r => setTimeout(r, 40));
+    if (!imgDlg.open) return;
     let cv; try { cv = noteCanvas(n); } catch (e) { imgDlg.close(); return toast('这条便签生成图片时出错了。'); }
     cv.toBlob(b => {
       if (!b) { imgDlg.close(); return toast('这个浏览器无法生成图片。'); }
-      shotBlob = b; shotName = `note-${localIso(n.updated || now())}.jpg`;
+      shotBlob = b; shotName = `note-${fileStamp()}.jpg`;      // 精确到秒，一天导出几张也不会重名
       if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
       img.src = img.dataset.url = URL.createObjectURL(b);
-      img.onload = () => { img.hidden = false; wait.hidden = true; save.disabled = false; };
-    }, 'image/jpeg', 0.92);                                    // 纸纹是细颗粒，PNG 会有好几 MB；高质量 JPEG 只要一两 MB
-  }, 60);
+      shotPng = new Promise(r => cv.toBlob(r, 'image/png'));
+      img.onload = () => { if (seq !== shotSeq) return; img.hidden = false; wait.hidden = true; shotState('ready'); copyShot(true); };   // 做好就自动复制一份
+    }, 'image/jpeg', 0.84);                                    // 一张短便签 100 KB 左右，长的两三百 KB
+  })();
 }
 $('#saveImg').addEventListener('click', () => { if (shotBlob) download(shotBlob, shotName); });
+$('#copyImg').addEventListener('click', () => copyShot(false));
+$('#shareImg').addEventListener('click', async () => {
+  if (!shotBlob) return;
+  try { await navigator.share({files:[new File([shotBlob], shotName, {type:'image/jpeg'})]}); }
+  catch (e) { if (e && e.name !== 'AbortError') toast('没能打开分享。可以用“复制图片”或“保存图片”。'); }
+});
 
 /* ═════════ 甘特图 ═════════ */
 const scroll = $('#scroll'), canvas = $('#canvas');
@@ -5194,9 +5287,9 @@ const TYPES = {
   metric:{name:'数值记录', short:'记录', icon:'pulse', coll:'metrics', multi:true, ph:'记什么，例如：体重', desc:'体重、跑步、睡眠、论文字数……任何数字，记下来自动画成曲线。'},
 };
 const TN = Object.fromEntries([...TNORM, ...XNORM]);
-const XTITLE = {tpls:t => '模板：' + t.name, reading:r => r.title, trips:t => t.name, habits:h => h.name, counts:c => c.title, reviews:r => '周回顾 ' + r.id.slice(3), links:l => l.title,
+const XTITLE = {places:p => '地点：' + p.name, tpls:t => '模板：' + t.name, reading:r => r.title, trips:t => t.name, habits:h => h.name, counts:c => c.title, reviews:r => '周回顾 ' + r.id.slice(3), links:l => l.title,
   ledger:e => `${e.date} ${e.cat || ''} ${e.amt}`, cards:c => c.title, metrics:e => `${e.date} ${e.v}`};
-const XKIND = {tpls:'便签模板', reading:'文献', trips:'会议出差', habits:'习惯', counts:'倒数日', reviews:'周回顾', links:'链接', ledger:'记账', cards:'看板卡片', metrics:'数值'};
+const XKIND = {places:'便签地点', tpls:'便签模板', reading:'文献', trips:'会议出差', habits:'习惯', counts:'倒数日', reviews:'周回顾', links:'链接', ledger:'记账', cards:'看板卡片', metrics:'数值'};
 const prefById = id => data.prefs.find(p => p.id === id && !p.deleted);
 function modDef(id){
   if (!id || id === 'desk') return null;
@@ -7800,6 +7893,13 @@ setInterval(() => { if (route === 'desk' && ui.view === 'today' && !document.hid
 
 /* ═════════ 便签模板：组会记录、审稿回复、会议总结、每日便签，也可以把自己的便签存成模板 ═════════ */
 const TPL_BUILTIN = [
+  {id:'diary', name:'日记', text:'{|}'},
+  {id:'advisor', name:'导师谈话', text:'# 和导师谈 {date}\n\n## 我想问的\n- {|}\n\n## 导师的意见\n- \n\n## 说好的下一步\n- [ ] \n'},
+  {id:'paper', name:'文献笔记', text:'# {|}\n\n作者、年份、期刊：\n\n## 想解决什么问题\n- \n\n## 方法和数据\n- \n\n## 主要结论\n- \n\n## 对我有什么用\n- \n'},
+  {id:'talk', name:'报告笔记', text:'# 报告：{|}\n\n报告人：　时间：{date}\n\n## 要点\n- \n\n## 和我的研究有关的\n- \n\n## 想问的问题\n- \n'},
+  {id:'obs', name:'观测记录', text:'# 观测记录 {date}\n\n| 项目 | 内容 |\n| --- | --- |\n| 仪器 |  |\n| 目标 |  |\n| 时间（UT） |  |\n| 天气和视宁度 |  |\n\n## 经过\n- {|}\n\n## 问题\n- \n\n## 数据放在哪\n- \n'},
+  {id:'week', name:'周计划', text:'# 本周计划 {week}\n\n## 一定要完成\n- [ ] {|}\n\n## 争取完成\n- [ ] \n\n## 要回复的人\n- \n\n## 这周的一点期待\n- \n'},
+  {id:'idea', name:'灵感', text:'# 想法：{|}\n\n## 为什么有意思\n- \n\n## 怎么验证\n- \n\n## 相关文献\n- \n'},
   {id:'meeting', name:'组会记录', text:'# 组会 {date}\n\n参加：\n\n## 我的进展\n- {|}\n\n## 讨论和建议\n- \n\n## 接下来要做\n- [ ] \n'},
   {id:'review', name:'审稿回复', text:'# 审稿意见回复：{|}\n\n> [!note] 稿件\n> 期刊：　稿号：　返修截止：\n\n## 审稿人 1\n\n### 意见 1\n> \n\n**回复：**\n\n**改动：**（页码、行号）\n\n### 意见 2\n> \n\n**回复：**\n\n**改动：**\n\n## 还要做的\n- [ ] 改图\n- [ ] 写 response letter\n- [ ] 请合作者过目\n'},
   {id:'conf', name:'会议总结', text:'# 会议总结：{|}\n\n时间地点：{date}\n\n## 印象深的报告\n| 报告人 | 题目 | 要点 |\n| --- | --- | --- |\n|  |  |  |\n\n## 认识的人、可能的合作\n- \n\n## 想读的文献\n- \n\n## 回来要做的\n- [ ] 报销\n- [ ] \n'},
@@ -7808,18 +7908,30 @@ const TPL_BUILTIN = [
 const allTpls = () => [...TPL_BUILTIN, ...live(data.tpls).sort((a, b) => a.created - b.created).map(t => ({...t, mine:true}))];
 const tplSlash = () => allTpls().map(t => ({label:'模板：' + t.name, hint:t.mine ? '我的模板' : '模板', kw:'template mb moban ' + t.id, fn:'tpl', tpl:t.id}));
 const tplBar = $('#tplBar');
-function renderTplBar(){
-  const show = !!cur && !cur.text.trim();
-  tplBar.hidden = !show; if (!show) return;
-  const list = allTpls(), order = cur.day ? [list.find(t => t.id === 'daily'), ...list.filter(t => t.id !== 'daily')] : list;
-  tplBar.innerHTML = `<span class="tpl-lead">用模板开始</span>${order.map(t => `<span class="tpl-chip${t.mine ? ' mine' : ''}"><button type="button" data-tpl="${esc(t.id)}">${esc(t.name)}</button>${t.mine ? `<button type="button" class="tpl-x" data-tplx="${esc(t.id)}" aria-label="删除模板“${esc(t.name)}”" title="删除这个模板">×</button>` : ''}</span>`).join('')}`;
+const TPL_ORDER = ['diary', 'daily', 'meeting', 'advisor', 'paper', 'talk', 'conf', 'review', 'obs', 'week', 'idea'];
+let tplMore = false, tplMoreFor = null;
+const tplPicked = new Set();                                   // 选了“日记”但还没写字的便签：模板条先收起来
+function tplOrdered(){
+  const use = ui.tplUse || {}, list = allTpls(), rank = t => { const i = TPL_ORDER.indexOf(t.id); return i < 0 ? 99 : i; };
+  const day = t => cur && cur.day && (t.id === 'diary' || t.id === 'daily') ? 0 : 1;          // 每日便签里，日记和每日便签总在最前面
+  return list.map((t, i) => ({t, i})).sort((a, b) => day(a.t) - day(b.t) || (use[b.t.id] || 0) - (use[a.t.id] || 0) || rank(a.t) - rank(b.t) || a.i - b.i).map(x => x.t);
 }
-function tplSync(){ const want = !!cur && !cur.text.trim(); if (tplBar.hidden === want) renderTplBar(); }
+function renderTplBar(){
+  const show = !!cur && !cur.text.trim() && !tplPicked.has(cur.id);
+  tplBar.hidden = !show; if (!show) return;
+  if (tplMoreFor !== cur.id) { tplMore = false; tplMoreFor = cur.id; }
+  const all = tplOrdered(), N = 6, order = tplMore ? all : all.slice(0, N);
+  tplBar.innerHTML = `<span class="tpl-lead">用模板开始</span>${order.map(t => `<span class="tpl-chip${t.mine ? ' mine' : ''}"><button type="button" data-tpl="${esc(t.id)}">${esc(t.name)}</button>${t.mine ? `<button type="button" class="tpl-x" data-tplx="${esc(t.id)}" aria-label="删除模板“${esc(t.name)}”" title="删除这个模板">×</button>` : ''}</span>`).join('')}${all.length > N ? `<button type="button" class="tpl-more" data-tplmore aria-expanded="${tplMore}">${tplMore ? '收起' : `更多 ${all.length - N} 个`}</button>` : ''}`;
+}
+function tplSync(){ if (cur && cur.text.trim()) tplPicked.delete(cur.id); const want = !!cur && !cur.text.trim() && !tplPicked.has(cur.id); if (tplBar.hidden === want) renderTplBar(); }
+function weekRange(){ const T = todayN(), w = (parts(T).w + 6) % 7; return `${fmtShort(T - w)} – ${fmtShort(T - w + 6)}`; }
 function applyTpl(t){
   if (!t || !cur) return;
   const empty = cm ? !cm.state.doc.toString().trim() : !edit.value.trim();
-  let s = t.text.replace(/\{date\}/g, fmtLong(cur.day || todayIso()));
-  if (t.id === 'daily' && !cur.day && empty) s = `# ${fmtLong(todayIso())}\n\n` + s;
+  let s = t.text.replace(/\{date\}/g, fmtLong(cur.day || todayIso())).replace(/\{week\}/g, weekRange());
+  if ((t.id === 'daily' || t.id === 'diary') && !cur.day && empty) s = `# ${fmtLong(todayIso())}\n\n` + s;
+  ui.tplUse = {...(ui.tplUse || {}), [t.id]:now()}; saveUI();
+  if (t.id === 'diary') { if (!s.replace('{|}', '').trim()) { tplPicked.add(cur.id); renderTplBar(); } capturePlace(cur, {ask:true}); }     // 日记：顺手记下地点和天气
   const at = s.indexOf('{|}'); s = s.replace('{|}', '');
   if (cm) {
     const doc = cm.state.doc;
@@ -7832,15 +7944,99 @@ tplBar.addEventListener('mousedown', e => { if (e.target.closest('button')) e.pr
 tplBar.addEventListener('click', e => {
   const x = e.target.closest('[data-tplx]');
   if (x) { const t = data.tpls.find(y => y.id === x.dataset.tplx); if (!t) return; const snap = {...t}; adopt(t, normTpl({...t, deleted:true, updated:now()})); changed(); renderTplBar(); toast(`已删除模板“${snap.name}”`, '撤销', () => { adopt(t, normTpl({...snap, updated:now()})); changed(); renderTplBar(); }); return; }
+  if (e.target.closest('[data-tplmore]')) { tplMore = !tplMore; renderTplBar(); return; }
   const b = e.target.closest('[data-tpl]'); if (b) applyTpl(allTpls().find(t => t.id === b.dataset.tpl));
 });
 function saveAsTpl(){
   if (!cur || !cur.text.trim()) return toast('这条便签还是空的。');
   const name = prompt('模板名称', noteTitle(cur).slice(0, 30)); if (name == null) return;
   const t = now(), nm = name.trim().slice(0, 30) || '我的模板';
-  data.tpls.push(normTpl({id:newId(), name:nm, text:cur.text, created:t, updated:t})); changed();
+  const nt = normTpl({id:newId(), name:nm, text:cur.text, created:t, updated:t}); data.tpls.push(nt); changed();
+  ui.tplUse = {...(ui.tplUse || {}), [nt.id]:t}; saveUI();          // 刚存的模板排在最前面
   toast(`已存为模板“${nm}”。新建空白便签时就能选它。`);
 }
+/* ═════════ 便签的地点和天气 ═════════ */
+const K_GEO = APP + '-geo';                                     // 这台设备上次定位的结果（只在本机，不同步）
+const WMO = c => c === 0 || c === 1 ? '晴' : c === 2 ? '多云' : c === 3 ? '阴' : c === 45 || c === 48 ? '雾' : c >= 51 && c <= 57 ? '毛毛雨'
+  : c === 61 || c === 80 ? '小雨' : c === 63 || c === 81 ? '中雨' : c === 65 || c === 82 ? '大雨' : c === 66 || c === 67 ? '冻雨'
+  : c === 71 || c === 85 ? '小雪' : c === 73 ? '中雪' : c === 75 || c === 86 ? '大雪' : c === 77 ? '雪粒' : c >= 95 ? '雷雨' : '';
+function placeOf(n){ if (!n) return null; for (const p of data.places) if (p.id === n.id && !p.deleted) return p; return null; }
+function isFresh(n){ return !!n && (n.day ? n.day === todayIso() : now() - (n.created || now()) < 12 * 3600e3); }
+const placeLabel = p => p.name + (p.wx ? ` · ${p.wx.t}${p.wx.c != null ? ' ' + p.wx.c + '°' : ''}` : '');
+const placeBusy = new Set(), placeTried = new Set();
+let geoErr = '';
+function setPlace(n, o){
+  const old = data.places.find(p => p.id === n.id), t = now();
+  const x = normPlace({...o, id:n.id, created:(old && old.created) || t, updated:t, deleted:!!o.deleted});
+  if (!x) return;
+  if (old) adopt(old, x); else data.places.push(x);
+  changed(); renderPlace();
+}
+async function geoPerm(){ try { return (await navigator.permissions.query({name:'geolocation'})).state; } catch (_) { return 'prompt'; } }
+function getJson(url){
+  const ac = 'AbortController' in window ? new AbortController() : null, tm = setTimeout(() => ac && ac.abort(), 8000);
+  return fetch(url, {signal:ac && ac.signal, cache:'no-store'}).then(r => r.ok ? r.json() : null).catch(() => null).finally(() => clearTimeout(tm));
+}
+async function lookupPlace(force){
+  const c0 = loadJson(K_GEO, null);
+  if (!force && c0 && c0.name && now() - c0.at < 30 * 60000) return c0;
+  const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, {enableHighAccuracy:false, timeout:12000, maximumAge:10 * 60000}));
+  const lat = Math.round(pos.coords.latitude * 100) / 100, lon = Math.round(pos.coords.longitude * 100) / 100;     // 精确到约 1 公里就够查城市
+  const near = c0 && c0.name && Math.abs(c0.lat - lat) < 0.04 && Math.abs(c0.lon - lon) < 0.06;
+  const [rg, wx] = await Promise.all([
+    near ? null : getJson(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1&accept-language=zh-CN,zh,en`),
+    getJson(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`)]);
+  let name = near ? c0.name : '';
+  if (rg) { const a = rg.address || {}; name = a.city || a.town || a.village || a.municipality || a.city_district || a.county || a.state || rg.name || ''; }
+  const cw = wx && wx.current, w = cw && isFinite(cw.weather_code) && WMO(cw.weather_code) ? {t:WMO(cw.weather_code), c:isFinite(cw.temperature_2m) ? Math.round(cw.temperature_2m) : null} : null;
+  if (!name) throw new Error('noname');
+  const g = {at:now(), lat, lon, name:String(name).slice(0, 40), wx:w};
+  lsSet(K_GEO, JSON.stringify(g));
+  return g;
+}
+/* ask：可以弹出浏览器的定位权限询问（用户点了按钮时）；不然只在已经允许过的情况下悄悄定位 */
+async function capturePlace(n, opt = {}){
+  if (!n || !('geolocation' in navigator) || placeBusy.has(n.id)) return null;
+  const st = await geoPerm();
+  if (st === 'denied') { geoErr = '浏览器不允许这个网页定位。可以在浏览器的网站设置里打开“位置”权限。'; return null; }
+  if (st !== 'granted' && !opt.ask) return null;
+  placeBusy.add(n.id); renderPlace();
+  try {
+    const g = await lookupPlace(opt.force);
+    if (ui.geoNo) { delete ui.geoNo; saveUI(); }
+    setPlace(n, {name:g.name, wx:isFresh(n) ? g.wx : null});
+    return g;
+  } catch (e) {
+    if (e && e.code === 1) { ui.geoNo = true; saveUI(); geoErr = '没有得到定位权限。'; }
+    else geoErr = '没能定位，或者没查到地名（可能没联网）。';
+    return null;
+  } finally { placeBusy.delete(n.id); renderPlace(); }
+}
+function autoPlace(n){                                         // 新写的便签：如果已经允许过定位，就悄悄记下在哪写的
+  if (!n || !n.text.trim() || placeOf(n) || placeTried.has(n.id) || !isFresh(n)) return;
+  placeTried.add(n.id); capturePlace(n);
+}
+function renderPlace(){
+  const b = $('#notePlace'); if (!b) return;
+  if (!cur) { b.hidden = true; return; }
+  const p = placeOf(cur), busy = placeBusy.has(cur.id);
+  b.hidden = false; b.classList.toggle('empty', !p && !busy); b.classList.toggle('busy', busy);
+  b.lastElementChild.textContent = busy ? '正在定位…' : p ? placeLabel(p) : '';
+  b.title = p ? '地点和天气：点一下修改' : '添加地点（用浏览器定位）'; b.setAttribute('aria-label', p ? '地点：' + placeLabel(p) : '添加地点');
+}
+$('#notePlace').addEventListener('click', async () => {
+  const n = cur; if (!n || placeBusy.has(n.id)) return;
+  const p = placeOf(n);
+  if (p) {
+    const v = prompt('地点（可以直接改；清空再点一次“添加地点”会重新定位）', p.name); if (v == null) return;
+    return setPlace(n, v.trim() ? {...p, name:v.trim()} : {...p, deleted:true});
+  }
+  geoErr = '';
+  const g = await capturePlace(n, {ask:true, force:true});
+  if (g) return toast(`已记下：${placeLabel(placeOf(n))}`);
+  const v = prompt((geoErr || '没能定位。') + '\n也可以直接写地点：', ''); if (v && v.trim()) setPlace(n, {name:v.trim()});
+});
+
 function newNoteWith(id){ go('desk'); setTab('notes'); $('#btnNew').click(); setTimeout(() => applyTpl(allTpls().find(t => t.id === id)), 30); }
 
 /* ⌘K 里的新命令 */
